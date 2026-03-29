@@ -1,45 +1,52 @@
 #!/usr/bin/env python3
-"""bloom_filter2 - Counting Bloom filter with delete support and FPR estimation."""
-import sys, math
+"""bloom_filter2 - Bloom filter with optimal sizing and false positive estimation."""
+import sys, math, hashlib
 
-class CountingBloom:
-    def __init__(self, capacity=1000, fp_rate=0.01):
-        self.size = max(1, int(-capacity * math.log(fp_rate) / (math.log(2)**2)))
-        self.k = max(1, int(self.size / capacity * math.log(2)))
-        self.counts = [0] * self.size
-        self.n = 0
+class BloomFilter:
+    def __init__(self, capacity, fp_rate=0.01):
+        self.capacity = capacity
+        self.fp_rate = fp_rate
+        self.size = self._optimal_size(capacity, fp_rate)
+        self.num_hashes = self._optimal_hashes(self.size, capacity)
+        self.bits = [False] * self.size
+        self.count = 0
+    @staticmethod
+    def _optimal_size(n, p):
+        return max(1, int(-n * math.log(p) / (math.log(2) ** 2)))
+    @staticmethod
+    def _optimal_hashes(m, n):
+        return max(1, int(m / n * math.log(2)))
     def _hashes(self, item):
-        s = str(item)
-        h1 = hash(s) & 0xFFFFFFFF
-        h2 = hash(s + "_salt") & 0xFFFFFFFF
-        return [(h1 + i * h2) % self.size for i in range(self.k)]
+        s = str(item).encode()
+        h1 = int(hashlib.md5(s).hexdigest(), 16)
+        h2 = int(hashlib.sha1(s).hexdigest(), 16)
+        return [(h1 + i * h2) % self.size for i in range(self.num_hashes)]
     def add(self, item):
         for idx in self._hashes(item):
-            self.counts[idx] += 1
-        self.n += 1
+            self.bits[idx] = True
+        self.count += 1
     def __contains__(self, item):
-        return all(self.counts[idx] > 0 for idx in self._hashes(item))
-    def remove(self, item):
-        if item not in self: return False
-        for idx in self._hashes(item):
-            self.counts[idx] = max(0, self.counts[idx] - 1)
-        self.n -= 1
-        return True
-    def fp_rate(self):
-        if self.n == 0: return 0.0
-        return (1 - math.exp(-self.k * self.n / self.size)) ** self.k
+        return all(self.bits[idx] for idx in self._hashes(item))
+    def estimated_fp_rate(self):
+        ones = sum(self.bits)
+        if ones == 0:
+            return 0.0
+        return (ones / self.size) ** self.num_hashes
 
 def test():
-    bf = CountingBloom(100, 0.01)
-    for i in range(50): bf.add(f"item_{i}")
-    for i in range(50): assert f"item_{i}" in bf
-    fp = sum(1 for i in range(1000, 2000) if f"item_{i}" in bf)
-    assert fp < 100  # <10% FP
-    bf.remove("item_0")
-    assert "item_0" not in bf
-    assert "item_1" in bf
-    assert bf.fp_rate() > 0
-    print("bloom_filter2: all tests passed")
+    bf = BloomFilter(1000, 0.01)
+    for i in range(500):
+        bf.add(f"item_{i}")
+    for i in range(500):
+        assert f"item_{i}" in bf
+    fp = sum(1 for i in range(10000, 11000) if f"item_{i}" in bf)
+    assert fp < 50  # should be ~1% = ~10, allow some margin
+    assert bf.count == 500
+    assert bf.size > 0 and bf.num_hashes > 0
+    print("OK: bloom_filter2")
 
 if __name__ == "__main__":
-    test() if "--test" in sys.argv else print("Usage: bloom_filter2.py --test")
+    if len(sys.argv) > 1 and sys.argv[1] == "test":
+        test()
+    else:
+        print("Usage: bloom_filter2.py test")

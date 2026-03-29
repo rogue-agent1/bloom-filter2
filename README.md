@@ -1,11 +1,11 @@
-# bloom_filter2
+# bloom-filter2
 
-bloom_filter2 - Counting Bloom filter with delete support and FPR estimation.
+Bloom filter with optimal sizing and false positive estimation.
 
 ## Usage
 
 ```bash
-python3 bloom_filter2.py --test
+python3 bloom_filter2.py test
 ```
 
 Zero dependencies. Python 3.8+.
