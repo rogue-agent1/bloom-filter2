@@ -1,10 +1,11 @@
 # bloom-filter2
 
-Single-file Python CLI. Zero dependencies.
+Bloom filter with configurable false positive rate
+
+Zero-dependency, single-file Python 3.8+ CLI tool.
 
 ## Usage
 
 ```bash
-python3 bloom_filter2.py
-python3 bloom_filter2.py test
+python bloom_filter2.py
 ```
